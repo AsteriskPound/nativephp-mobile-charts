@@ -67,12 +67,11 @@ class Chart extends Element
     }
 
     /**
-     * Normalization floor for the value axis — line charts only (bar's
-     * baseline and radar's center always stay 0, since a non-zero floor
-     * would misrepresent magnitude for those kinds). Set this to the
-     * series' actual minimum to fill the plot area with the data's real
-     * value range instead of padding down to 0. Falls back to 0 when
-     * omitted.
+     * Normalization floor for the value axis — line and bar charts only
+     * (radar's center always stays 0, since its spokes represent magnitude
+     * from a common origin). Set this to the series' actual minimum to
+     * fill the plot area with the data's real value range instead of
+     * padding down to 0. Falls back to 0 when omitted.
      */
     public function yMin(float $min): static
     {

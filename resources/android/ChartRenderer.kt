@@ -40,20 +40,20 @@ object ChartRenderer {
         val series = parseSeries(p.getString("series", "[]"))
         val explicitMax = p.getFloat("y_max", 0f)
         val yMax = if (explicitMax > 0f) explicitMax else autoMax(series)
-        // Only the line chart honors a non-zero floor — a bar's baseline and
-        // a radar's center are always 0, or their length stops representing
-        // magnitude.
-        val yMin = if (kind == "line" && p.has("y_min")) p.getFloat("y_min", 0f) else 0f
+        // Line and bar charts can honor a non-zero floor to zoom into the
+        // data's value range; radar's center is always 0, or its spokes
+        // stop representing magnitude from a common origin.
+        val yMin = if ((kind == "line" || kind == "bar") && p.has("y_min")) p.getFloat("y_min", 0f) else 0f
 
         Canvas(modifier = modifier) {
-            if (kind == "line") {
+            if (kind == "line" || kind == "bar") {
                 drawValueGrid(this, yMin, yMax)
             } else {
                 drawGrid(this)
             }
 
             when (kind) {
-                "bar" -> drawBars(this, series, yMax)
+                "bar" -> drawBars(this, series, yMin, yMax)
                 "radar" -> drawRadar(this, labels, series, yMax)
                 else -> drawLines(this, series, yMin, yMax)
             }
@@ -167,10 +167,11 @@ object ChartRenderer {
         }
     }
 
-    private fun drawBars(scope: DrawScope, series: List<ChartSeries>, yMax: Float) {
+    private fun drawBars(scope: DrawScope, series: List<ChartSeries>, yMin: Float, yMax: Float) {
         val groupCount = series.maxOfOrNull { it.values.size } ?: return
         if (groupCount == 0) return
 
+        val range = (yMax - yMin).let { if (it != 0f) it else 1f }
         val groupWidth = scope.size.width / groupCount
         val barWidth = groupWidth / (series.size + 1)
 
@@ -178,7 +179,12 @@ object ChartRenderer {
             s.values.forEachIndexed { i, value ->
                 if (value == null) return@forEachIndexed
 
-                val barHeight = scope.size.height * (value / yMax)
+                // Clamped defensively — a value outside [yMin, yMax] (a
+                // stale or mismatched upstream max) shortens/caps the bar
+                // instead of drawing it past the canvas into whatever UI
+                // sits above the chart.
+                val clamped = value.coerceIn(yMin, yMax)
+                val barHeight = scope.size.height * ((clamped - yMin) / range)
                 val x = i * groupWidth + barWidth * (seriesIndex + 0.5f)
 
                 scope.drawRect(

@@ -29,13 +29,13 @@ struct ChartRenderer: View {
         let series = Self.parseSeries(p.getString("series", default: "[]"))
         let explicitMax = Double(p.getFloat("y_max", default: 0))
         let yMax = explicitMax > 0 ? explicitMax : Self.autoMax(series)
-        // Only the line chart honors a non-zero floor — a bar's baseline and
-        // a radar's center are always 0, or their length stops representing
-        // magnitude.
-        let yMin = kind == "line" && p.has("y_min") ? Double(p.getFloat("y_min", default: 0)) : 0
+        // Line and bar charts can honor a non-zero floor to zoom into the
+        // data's value range; radar's center is always 0, or its spokes
+        // stop representing magnitude from a common origin.
+        let yMin = (kind == "line" || kind == "bar") && p.has("y_min") ? Double(p.getFloat("y_min", default: 0)) : 0
 
         Canvas { context, size in
-            if kind == "line" {
+            if kind == "line" || kind == "bar" {
                 Self.drawValueGrid(context, size, yMin, yMax)
             } else {
                 Self.drawGrid(context, size)
@@ -43,7 +43,7 @@ struct ChartRenderer: View {
 
             switch kind {
             case "bar":
-                Self.drawBars(context, size, series, yMax)
+                Self.drawBars(context, size, series, yMin, yMax)
             case "radar":
                 Self.drawRadar(context, size, labels, series, yMax)
             default:
@@ -181,10 +181,11 @@ struct ChartRenderer: View {
         }
     }
 
-    private static func drawBars(_ context: GraphicsContext, _ size: CGSize, _ series: [Series], _ yMax: Double) {
+    private static func drawBars(_ context: GraphicsContext, _ size: CGSize, _ series: [Series], _ yMin: Double, _ yMax: Double) {
         let groupCount = series.map(\.values.count).max() ?? 0
         guard groupCount > 0 else { return }
 
+        let range = (yMax - yMin) != 0 ? (yMax - yMin) : 1
         let groupWidth = size.width / CGFloat(groupCount)
         let barWidth = groupWidth / CGFloat(series.count + 1)
 
@@ -192,7 +193,12 @@ struct ChartRenderer: View {
             for (i, value) in s.values.enumerated() {
                 guard let value else { continue }
 
-                let barHeight = size.height * CGFloat(value / yMax)
+                // Clamped defensively — a value outside [yMin, yMax] (a
+                // stale or mismatched upstream max) shortens/caps the bar
+                // instead of drawing it past the canvas into whatever UI
+                // sits above the chart.
+                let clamped = min(max(value, yMin), yMax)
+                let barHeight = size.height * CGFloat((clamped - yMin) / range)
                 let x = CGFloat(i) * groupWidth + barWidth * (CGFloat(seriesIndex) + 0.5)
 
                 let rect = CGRect(x: x, y: size.height - barHeight, width: barWidth * 0.8, height: barHeight)
