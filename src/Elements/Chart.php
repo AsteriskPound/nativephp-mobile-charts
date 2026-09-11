@@ -66,6 +66,21 @@ class Chart extends Element
         return $this;
     }
 
+    /**
+     * Normalization floor for the value axis — line charts only (bar's
+     * baseline and radar's center always stay 0, since a non-zero floor
+     * would misrepresent magnitude for those kinds). Set this to the
+     * series' actual minimum to fill the plot area with the data's real
+     * value range instead of padding down to 0. Falls back to 0 when
+     * omitted.
+     */
+    public function yMin(float $min): static
+    {
+        $this->componentProps['y_min'] = $min;
+
+        return $this;
+    }
+
     public function applyAttributes(array $attrs): void
     {
         if (isset($attrs['kind'])) {
@@ -82,6 +97,10 @@ class Chart extends Element
 
         if (($yMax = $attrs['y-max'] ?? $attrs['y_max'] ?? null) !== null) {
             $this->yMax((float) $yMax);
+        }
+
+        if (($yMin = $attrs['y-min'] ?? $attrs['y_min'] ?? null) !== null) {
+            $this->yMin((float) $yMin);
         }
     }
 

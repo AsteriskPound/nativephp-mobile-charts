@@ -35,6 +35,12 @@ test('fluent labels/series/yMax encode to JSON on the wire', function () {
     expect($props['y_max'])->toBe(100.0);
 });
 
+test('fluent yMin encodes onto the wire', function () {
+    $props = chartProps(Chart::make()->yMin(62.4));
+
+    expect($props['y_min'])->toBe(62.4);
+});
+
 test('applyAttributes normalizes a plain array from a Blade :labels/:series binding', function () {
     $chart = Chart::make();
     $chart->applyAttributes([
@@ -42,6 +48,7 @@ test('applyAttributes normalizes a plain array from a Blade :labels/:series bind
         'labels' => ['GE', 'Visual', 'Music'],
         'series' => [['name' => 'A', 'values' => [80.0, 70.0, 90.0]]],
         'y-max' => '100',
+        'y-min' => '10',
     ]);
 
     $props = chartProps($chart);
@@ -49,6 +56,7 @@ test('applyAttributes normalizes a plain array from a Blade :labels/:series bind
     expect($props['kind'])->toBe('radar');
     expect(json_decode($props['labels'], true))->toBe(['GE', 'Visual', 'Music']);
     expect($props['y_max'])->toBe(100.0);
+    expect($props['y_min'])->toBe(10.0);
 });
 
 test('applyAttributes accepts a pre-encoded JSON string for labels/series', function () {

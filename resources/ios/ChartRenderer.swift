@@ -29,6 +29,10 @@ struct ChartRenderer: View {
         let series = Self.parseSeries(p.getString("series", default: "[]"))
         let explicitMax = Double(p.getFloat("y_max", default: 0))
         let yMax = explicitMax > 0 ? explicitMax : Self.autoMax(series)
+        // Only the line chart honors a non-zero floor — a bar's baseline and
+        // a radar's center are always 0, or their length stops representing
+        // magnitude.
+        let yMin = kind == "line" && p.has("y_min") ? Double(p.getFloat("y_min", default: 0)) : 0
 
         Canvas { context, size in
             Self.drawGrid(context, size)
@@ -39,7 +43,7 @@ struct ChartRenderer: View {
             case "radar":
                 Self.drawRadar(context, size, labels, series, yMax)
             default:
-                Self.drawLines(context, size, series, yMax)
+                Self.drawLines(context, size, series, yMin, yMax)
             }
         }
     }
@@ -99,7 +103,9 @@ struct ChartRenderer: View {
         }
     }
 
-    private static func drawLines(_ context: GraphicsContext, _ size: CGSize, _ series: [Series], _ yMax: Double) {
+    private static func drawLines(_ context: GraphicsContext, _ size: CGSize, _ series: [Series], _ yMin: Double, _ yMax: Double) {
+        let range = (yMax - yMin) != 0 ? (yMax - yMin) : 1
+
         for s in series {
             let count = s.values.count
             guard count >= 2 else { continue }
@@ -119,7 +125,7 @@ struct ChartRenderer: View {
                     continue
                 }
 
-                let point = CGPoint(x: CGFloat(i) * stepX, y: size.height * (1 - CGFloat(value / yMax)))
+                let point = CGPoint(x: CGFloat(i) * stepX, y: size.height * (1 - CGFloat((value - yMin) / range)))
 
                 if path == nil {
                     path = Path()

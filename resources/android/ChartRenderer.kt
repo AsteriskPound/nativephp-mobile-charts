@@ -40,6 +40,10 @@ object ChartRenderer {
         val series = parseSeries(p.getString("series", "[]"))
         val explicitMax = p.getFloat("y_max", 0f)
         val yMax = if (explicitMax > 0f) explicitMax else autoMax(series)
+        // Only the line chart honors a non-zero floor — a bar's baseline and
+        // a radar's center are always 0, or their length stops representing
+        // magnitude.
+        val yMin = if (kind == "line" && p.has("y_min")) p.getFloat("y_min", 0f) else 0f
 
         Canvas(modifier = modifier) {
             drawGrid(this)
@@ -47,7 +51,7 @@ object ChartRenderer {
             when (kind) {
                 "bar" -> drawBars(this, series, yMax)
                 "radar" -> drawRadar(this, labels, series, yMax)
-                else -> drawLines(this, series, yMax)
+                else -> drawLines(this, series, yMin, yMax)
             }
         }
     }
@@ -96,7 +100,9 @@ object ChartRenderer {
         }
     }
 
-    private fun drawLines(scope: DrawScope, series: List<ChartSeries>, yMax: Float) {
+    private fun drawLines(scope: DrawScope, series: List<ChartSeries>, yMin: Float, yMax: Float) {
+        val range = (yMax - yMin).let { if (it != 0f) it else 1f }
+
         series.forEach { s ->
             val count = s.values.size
             if (count < 2) return@forEach
@@ -114,7 +120,7 @@ object ChartRenderer {
                     return@forEachIndexed
                 }
 
-                val point = Offset(i * stepX, scope.size.height * (1f - value / yMax))
+                val point = Offset(i * stepX, scope.size.height * (1f - (value - yMin) / range))
 
                 if (path == null) {
                     path = Path().apply { moveTo(point.x, point.y) }
