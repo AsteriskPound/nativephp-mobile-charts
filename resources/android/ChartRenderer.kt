@@ -32,6 +32,9 @@ object ChartRenderer {
     private val GRID_COLOR = Color(0x1F888888)
     private val DEFAULT_COLOR = Color(0xFF1DB954)
 
+    /** Target gridline count for a line chart's value axis is 12-15 lines. */
+    private const val MAX_GRID_LINES = 15
+
     @Composable
     fun Render(node: NativeUINode, modifier: Modifier) {
         val p = node.props
@@ -46,7 +49,11 @@ object ChartRenderer {
         val yMin = if (kind == "line" && p.has("y_min")) p.getFloat("y_min", 0f) else 0f
 
         Canvas(modifier = modifier) {
-            drawGrid(this)
+            if (kind == "line") {
+                drawValueGrid(this, yMin, yMax)
+            } else {
+                drawGrid(this)
+            }
 
             when (kind) {
                 "bar" -> drawBars(this, series, yMax)
@@ -98,6 +105,53 @@ object ChartRenderer {
             val y = scope.size.height * i / steps
             scope.drawLine(GRID_COLOR, Offset(0f, y), Offset(scope.size.width, y), strokeWidth = 1f)
         }
+    }
+
+    /**
+     * Line-chart grid: reference lines land on whole-number axis values
+     * (`yMin`/`yMax` are already whole numbers by convention — see the
+     * `Chart` element's `yMin`/`yMax` docs) rather than dividing the canvas
+     * into a fixed number of equal bands. `gridStep` picks the coarsest
+     * whole-number increment that keeps the line count at or under
+     * [MAX_GRID_LINES]; the topmost line may fall short of `yMax` when the
+     * range isn't an exact multiple of that step, which is preferable to a
+     * fractional (non-whole-number) step.
+     */
+    private fun drawValueGrid(scope: DrawScope, yMin: Float, yMax: Float) {
+        val range = yMax - yMin
+        if (range <= 0f) {
+            drawGrid(scope)
+            return
+        }
+
+        val step = gridStep(range)
+        var value = yMin
+        while (value <= yMax + 0.001f) {
+            val y = scope.size.height * (1f - (value - yMin) / range)
+            scope.drawLine(GRID_COLOR, Offset(0f, y), Offset(scope.size.width, y), strokeWidth = 1f)
+            value += step
+        }
+    }
+
+    /**
+     * The finest whole-number step whose line count doesn't exceed
+     * [MAX_GRID_LINES]. Scanning steps ascending and stopping at the first
+     * one under that ceiling naturally lands around 12-15 lines for most
+     * score ranges — e.g. range 42 hits step 3 (15 lines) immediately —
+     * but a range with no exact whole-number divisor in that window (e.g.
+     * 31: step 2 gives 16, step 3 gives 11) settles one line short of 12
+     * rather than jumping back up to an overcrowded step. A very small
+     * range (under ~12) can only ever produce a handful of whole-number
+     * lines no matter the step.
+     */
+    private fun gridStep(range: Float): Float {
+        val r = range.toInt().coerceAtLeast(1)
+        for (step in 1..r) {
+            if (r / step + 1 <= MAX_GRID_LINES) {
+                return step.toFloat()
+            }
+        }
+        return r.toFloat()
     }
 
     private fun drawLines(scope: DrawScope, series: List<ChartSeries>, yMin: Float, yMax: Float) {
