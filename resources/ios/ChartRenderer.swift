@@ -22,9 +22,6 @@ struct ChartRenderer: View {
     private static let gridColor = Color(white: 0.53, opacity: 0.12)
     private static let defaultColor = Color(red: 0x1D / 255, green: 0xB9 / 255, blue: 0x54 / 255)
 
-    /// Target gridline count for a line chart's value axis is 12-15 lines.
-    private static let maxGridLines = 15
-
     var body: some View {
         let p = node.props
         let kind = p.getString("kind", default: "line")
@@ -110,14 +107,13 @@ struct ChartRenderer: View {
         }
     }
 
-    /// Line-chart grid: reference lines land on whole-number axis values
-    /// (`yMin`/`yMax` are already whole numbers by convention — see the
-    /// `Chart` element's `yMin`/`yMax` docs) rather than dividing the canvas
-    /// into a fixed number of equal bands. `gridStep` picks the coarsest
-    /// whole-number increment that keeps the line count at or under
-    /// `maxGridLines`; the topmost line may fall short of `yMax` when the
-    /// range isn't an exact multiple of that step, which is preferable to a
-    /// fractional (non-whole-number) step.
+    /// Line-chart grid: reference lines land on multiples of 5 (or 10 for a
+    /// wide spread) rather than dividing the canvas into a fixed number of
+    /// equal bands, so every line can carry a label the app draws alongside
+    /// it (see the `dciscores-app` `PerformerCompare::axisStep()`/
+    /// `seasonChartData()`, which this mirrors — `yMin`/`yMax` are already
+    /// rounded to that same step's multiples by convention before they
+    /// reach here, so the topmost/bottommost lines land exactly on them).
     private static func drawValueGrid(_ context: GraphicsContext, _ size: CGSize, _ yMin: Double, _ yMax: Double) {
         let range = yMax - yMin
         guard range > 0 else {
@@ -137,23 +133,9 @@ struct ChartRenderer: View {
         }
     }
 
-    /// The finest whole-number step whose line count doesn't exceed
-    /// `maxGridLines`. Scanning steps ascending and stopping at the first
-    /// one under that ceiling naturally lands around 12-15 lines for most
-    /// score ranges — e.g. range 42 hits step 3 (15 lines) immediately —
-    /// but a range with no exact whole-number divisor in that window (e.g.
-    /// 31: step 2 gives 16, step 3 gives 11) settles one line short of 12
-    /// rather than jumping back up to an overcrowded step. A very small
-    /// range (under ~12) can only ever produce a handful of whole-number
-    /// lines no matter the step.
+    /// Mirrors `PerformerCompare::axisStep()` — see `drawValueGrid`'s doc.
     private static func gridStep(_ range: Double) -> Double {
-        let r = max(Int(range), 1)
-        for step in 1...r {
-            if r / step + 1 <= maxGridLines {
-                return Double(step)
-            }
-        }
-        return Double(r)
+        range > 50 ? 10 : 5
     }
 
     private static func drawLines(_ context: GraphicsContext, _ size: CGSize, _ series: [Series], _ yMin: Double, _ yMax: Double) {
