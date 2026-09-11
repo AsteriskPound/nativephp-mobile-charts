@@ -1,0 +1,14 @@
+{
+    "namespace": "Charts",
+
+    "components": [
+        {
+            "type": "chart",
+            "element": "Asteriskpound\\NativePhpMobileCharts\\Elements\\Chart",
+            "blade": "Asteriskpound\\NativePhpMobileCharts\\Components\\Chart",
+            "android_renderer": "com.asteriskpound.plugins.charts.ChartRenderer",
+            "ios_renderer": "ChartRenderer",
+            "self_closing": true
+        }
+    ]
+}
